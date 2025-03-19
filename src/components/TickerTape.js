@@ -25,14 +25,13 @@ const TickerTape = () => {
           ],
           showSymbolLogo: true,
           isTransparent: true,
-          displayMode: "adaptive",
+          displayMode: "compact",
           colorTheme: theme === "dark" ? "dark" : "light",
           locale: "en",
         });
         widgetContainer.appendChild(script);
       }, 100);
     }
-
     return () => {
       if (widgetContainer) {
         widgetContainer.innerHTML = "";
@@ -41,7 +40,7 @@ const TickerTape = () => {
   }, [theme]);
 
   return (
-    <div className="flex flex-col rounded shadow-md overflow-hidden bg-white dark:bg-gray-800 border-1 border-gray-500">
+    <div className="rounded shadow-md overflow-hidden bg-white dark:bg-gray-800 border border-gray-500 p-1" style={{ height: "80px" }}>
       <div className="p-0">
         <div className="tradingview-widget-container" ref={widgetContainerRef}>
           <div className="tradingview-widget-container__widget"></div>

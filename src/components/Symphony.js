@@ -2,7 +2,7 @@ import React from "react";
 
 const Symphony = () => {
   return (
-    <div className="w-[600px] h-[800px]">
+    <div className="w-[600px] h-[700px]">
       <iframe
         src="https://preview.symphony.com/"
         title="Symphony Chat"

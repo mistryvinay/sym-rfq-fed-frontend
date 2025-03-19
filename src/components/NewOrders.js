@@ -206,12 +206,12 @@ const currentOrders = newFilteredOrders.slice(startIndex, startIndex + pageSize)
                   {order.state === "working" ? (
                     <button
                       onClick={() => handleChatLaunch(order.room_id)}
-                      className={`w-24 inline-block text-center px-2 py-1 rounded-full text-xs font-medium ${getStateBadgeClass(order.state)}`}
+                      className={`w-24 h-8 border rounded flex items-center justify-center text-xs font-medium ${getStateBadgeClass(order.state)}`}
                     >
                       {order.state.toUpperCase()}
                     </button>
                   ) : (
-                    <span className={`w-24 inline-block text-center px-2 py-1 rounded-full text-xs font-medium ${getStateBadgeClass(order.state)}`}>
+                    <span className={`w-24 h-8 border rounded flex items-center justify-center text-xs font-medium ${getStateBadgeClass(order.state)}`}>
                       {order.state.toUpperCase()}
                     </span>
                   )}
