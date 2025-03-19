@@ -3,7 +3,7 @@ import { ThemeContext } from "./context/ThemeContext";
 import { useNavigate } from "react-router-dom";
 import TickerTape from "./components/TickerTape";
 import NewOrders from "./components/NewOrders";
-import WorkingOrders from "./components/WorkingOrders";
+import OrderHistory from "./components/OrderHistory";
 import Symphony from "./components/Symphony";
 
 const Home = () => {
@@ -65,9 +65,9 @@ const Home = () => {
           <NewOrders />
         </div>
 
-        {/* Two-column grid: WorkingOrders on the left, Symphony on the right */}
+        {/* Two-column grid: OrderHistory on the left, Symphony on the right */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <WorkingOrders />
+          <OrderHistory />
           <div className="w-full">
             <Symphony />
           </div>

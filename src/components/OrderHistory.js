@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-const WorkingOrders = () => {
+const OrderHistory = () => {
   const [orders, setOrders] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
@@ -101,7 +101,7 @@ const WorkingOrders = () => {
                 {order.buyAmount} {order.buyCurrency}
               </td>
               <td className="px-2 py-1">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStateBadgeClass(order.state)}`}>
+                <span className={`w-24 h-8 border rounded flex items-center justify-center text-xs font-medium ${getStateBadgeClass(order.state)}`}>
                   {order.state.toUpperCase()}
                 </span>
               </td>
@@ -124,4 +124,4 @@ const WorkingOrders = () => {
   );
 };
 
-export default WorkingOrders;
+export default OrderHistory;
