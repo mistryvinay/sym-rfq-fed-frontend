@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from "react";
 
+// New component for animating rows with a pulse effect.
+const AnimatedRow = ({ children }) => {
+  const [pulse, setPulse] = useState(true);
+  useEffect(() => {
+    const timeout = setTimeout(() => setPulse(false), 8000);
+    return () => clearTimeout(timeout);
+  }, []);
+  return <tr className={pulse ? "animate-pulse" : ""}>{children}</tr>;
+};
+
 const NewOrders = () => {
   const initialOrders = [
     {
@@ -101,7 +111,9 @@ const NewOrders = () => {
         ws.close();
       };
       ws.onclose = () => {
-        console.log("WebSocket disconnected in NewOrders, attempting reconnect in 5 seconds");
+        console.log(
+          "WebSocket disconnected in NewOrders, attempting reconnect in 5 seconds"
+        );
         reconnectTimeout = setTimeout(connect, 5000);
       };
     };
@@ -167,10 +179,8 @@ const NewOrders = () => {
     }
   };
 
-  const handlePrevPage = () =>
-    setCurrentPage((prev) => Math.max(prev - 1, 1));
-  const handleNextPage = () =>
-    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  const handlePrevPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1));
+  const handleNextPage = () => setCurrentPage((prev) => Math.min(prev + 1, totalPages));
 
   // In this demo, handleChatLaunch simply opens a new window.
   const handleChatLaunch = (room_id) => {
@@ -198,9 +208,11 @@ const NewOrders = () => {
           </thead>
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {currentOrders.map((order) => (
-              <tr key={order.quoteId}>
+              <AnimatedRow key={order.quoteId}>
                 <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">{order.quoteId}</td>
-                <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">{new Date(order.valueDate).toLocaleString()}</td>
+                <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                  {new Date(order.valueDate).toLocaleString()}
+                </td>
                 <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">{order.currencyPair}</td>
                 <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
                   {order.sellAmount} {order.sellCurrency}
@@ -227,16 +239,18 @@ const NewOrders = () => {
                       {order.state.toUpperCase()}
                     </button>
                   ) : (
-                    <span
-                      className={`w-24 h-8 border rounded flex items-center justify-center text-xs font-medium ${getStateBadgeClass(order.state)}`}
-                    >
+                    <span className={`w-24 h-8 border rounded flex items-center justify-center text-xs font-medium ${getStateBadgeClass(order.state)}`}>
                       {order.state.toUpperCase()}
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">{new Date(order.createdAt).toLocaleString()}</td>
-                <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">{new Date(order.expiresAt).toLocaleString()}</td>
-              </tr>
+                <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                  {new Date(order.createdAt).toLocaleString()}
+                </td>
+                <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                  {new Date(order.expiresAt).toLocaleString()}
+                </td>
+              </AnimatedRow>
             ))}
           </tbody>
         </table>

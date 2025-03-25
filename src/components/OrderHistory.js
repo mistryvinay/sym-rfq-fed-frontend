@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from "react";
 
+// Add this AnimatedRow component at the top of OrderHistory.js
+const AnimatedRow = ({ children }) => {
+  const [pulse, setPulse] = useState(true);
+  useEffect(() => {
+    const timeout = setTimeout(() => setPulse(false), 8000);
+    return () => clearTimeout(timeout);
+  }, []);
+  return <tr className={pulse ? "animate-pulse" : ""}>{children}</tr>;
+};
+
 const OrderHistory = () => {
   const [orders, setOrders] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -108,7 +118,7 @@ const OrderHistory = () => {
         </thead>
         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
           {currentOrders.map((order) => (
-            <tr key={order.quoteId}>
+            <AnimatedRow key={order.quoteId}>
               <td className="px-2 py-1 text-xs text-gray-700 dark:text-gray-200">{order.quoteId}</td>
               <td className="px-2 py-1 text-xs text-gray-700 dark:text-gray-200">
                 {new Date(order.valueDate).toLocaleString()}
@@ -128,7 +138,7 @@ const OrderHistory = () => {
                   {order.state.toUpperCase()}
                 </span>
               </td>
-            </tr>
+            </AnimatedRow>
           ))}
         </tbody>
       </table>
