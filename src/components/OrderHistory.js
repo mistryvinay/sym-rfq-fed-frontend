@@ -5,41 +5,68 @@ const OrderHistory = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
 
-  // Listen for orders via WebSocket and keep only orders with state "accepted"
   useEffect(() => {
-    const ws = new WebSocket("ws://localhost:8000/ws/orders");
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.orders && Array.isArray(data.orders)) {
-          setOrders((prevOrders) => {
-            const acceptedOrders = data.orders.filter(
-              (order) => order.state === "accepted"
-            );
-            // Combine and deduplicate by quoteId
-            const combined = [...acceptedOrders, ...prevOrders];
-            const deduped = combined.filter(
-              (order, index, self) =>
-                index === self.findIndex((o) => o.quoteId === order.quoteId)
-            );
-            return deduped;
-          });
+    let ws;
+    let reconnectTimeout;
+    const connect = () => {
+      ws = new WebSocket("ws://localhost:8000/ws/orders");
+      ws.onopen = () => {
+        console.log("WebSocket connected in OrderHistory");
+      };
+      ws.onmessage = (event) => {
+        console.log("Received order update in OrderHistory:", event.data);
+        try {
+          const data = JSON.parse(event.data);
+          let incomingOrders = [];
+          if (data.orders) {
+            incomingOrders = Array.isArray(data.orders) ? data.orders : [data.orders];
+          } else if (data.order) {
+            incomingOrders = [data.order];
+          }
+          // Filter incoming orders: only accepted or cancelled orders are relevant to history.
+          const filteredOrders = incomingOrders.filter(
+            (order) => order.state === "accepted" || order.state === "cancelled"
+          );
+          if (filteredOrders.length > 0) {
+            setOrders((prevOrders) => {
+              let updatedOrders = [...prevOrders];
+              filteredOrders.forEach((incoming) => {
+                const idx = updatedOrders.findIndex(
+                  (o) => o.quoteId === incoming.quoteId
+                );
+                if (idx > -1) {
+                  updatedOrders[idx] = incoming;
+                } else {
+                  updatedOrders.unshift(incoming);
+                }
+              });
+              return updatedOrders;
+            });
+          }
+        } catch (error) {
+          console.error("Error parsing WebSocket message in OrderHistory", error);
         }
-      } catch (error) {
-        console.error("Error parsing WebSocket message", error);
-      }
+      };
+      ws.onerror = (error) => {
+        console.error("WebSocket error in OrderHistory:", error);
+        ws.close();
+      };
+      ws.onclose = () => {
+        console.log(
+          "WebSocket disconnected in OrderHistory, attempting reconnect in 5 seconds"
+        );
+        reconnectTimeout = setTimeout(connect, 5000);
+      };
     };
 
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
-    };
-
+    connect();
     return () => {
-      ws.close();
+      clearTimeout(reconnectTimeout);
+      ws && ws.close();
     };
   }, []);
 
-  // Sort orders descending by createdAt
+  // Sort orders descending by createdAt.
   const sortedOrders = orders.slice().sort(
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
   );
@@ -50,25 +77,21 @@ const OrderHistory = () => {
   // Map order state to CSS badge classes.
   const getStateBadgeClass = (state) => {
     switch (state) {
-      case "new":
-        return "bg-green-500 text-white";
-      case "working":
-        return "bg-yellow-500 text-white animate-pulse";
       case "accepted":
         return "bg-blue-500 text-white";
-      case "completed":
-        return "bg-purple-500 text-white";
+      case "cancelled":
+        return "bg-red-500 text-white";
       default:
         return "bg-gray-500 text-white";
     }
   };
 
-  const handlePrevPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1));
+  const handlePrevPage = () =>
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
   const handleNextPage = () =>
     setCurrentPage((prev) => Math.min(prev + 1, totalPages));
 
   return (
-    // Changed from w-1/2 to w-full so the grid cell defines the width
     <div className="w-full rounded shadow-md overflow-hidden bg-white dark:bg-gray-800 border border-gray-500 p-4">
       <h2 className="text-lg font-semibold mb-4">Order History</h2>
       <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">

@@ -4,28 +4,28 @@ const NewOrders = () => {
   const initialOrders = [
     {
       quoteId: "D4F23E64",
-      valueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 1 day in the future
+      valueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       currencyPair: "EUR/USD",
       exchangeRate: "1.2140",
       sellCurrency: "EUR",
       sellAmount: "1000.00",
       buyCurrency: "USD",
       buyAmount: "1214.02",
-      createdAt: new Date(Date.now() - 60 * 1000).toISOString(), // 1 minute ago
-      expiresAt: new Date(Date.now() + 60 * 1000).toISOString(), // 1 minute in the future
+      createdAt: new Date(Date.now() - 60 * 1000).toISOString(),
+      expiresAt: new Date(Date.now() + 60 * 1000).toISOString(),
       state: "new",
     },
     {
       quoteId: "B1A23E54",
-      valueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 1 day in the future
+      valueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       currencyPair: "GBP/USD",
       exchangeRate: "1.3890",
       sellCurrency: "GBP",
       sellAmount: "500.00",
       buyCurrency: "USD",
       buyAmount: "694.51",
-      createdAt: new Date(Date.now() - 60 * 1000).toISOString(), // 1 minute ago
-      expiresAt: new Date(Date.now() + 60 * 1000).toISOString(), // 1 minute in the future
+      createdAt: new Date(Date.now() - 60 * 1000).toISOString(),
+      expiresAt: new Date(Date.now() + 60 * 1000).toISOString(),
       state: "new",
     },
     // More sample orders if needed...
@@ -33,16 +33,14 @@ const NewOrders = () => {
 
   const [orders, setOrders] = useState(initialOrders);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 5;
+  const pageSize = 2;
 
-  // Function to update order on the backend via a PUT request.
+  // Function to update an order on the backend via a PUT request.
   const updateOrderOnBackend = async (order) => {
     try {
       const response = await fetch(`http://localhost:8000/orders/${order.quoteId}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(order),
       });
       if (!response.ok) {
@@ -53,50 +51,78 @@ const NewOrders = () => {
     }
   };
 
-  // WebSocket: listen for new orders and prepend them to the orders list.
+  // WebSocket with auto‑reconnect logic and updated order state.
   useEffect(() => {
-    const ws = new WebSocket("ws://localhost:8000/ws/orders");
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        // Expect a payload with an "orders" array.
-        if (data.orders && Array.isArray(data.orders)) {
-          setOrders((prevOrders) => {
-            // Prepend new orders and filter out duplicates by quoteId.
-            const combined = [...data.orders, ...prevOrders];
-            const deduped = combined.filter(
-              (order, index, self) =>
-                index === self.findIndex((o) => o.quoteId === order.quoteId)
-            );
-            return deduped;
-          });
+    let ws;
+    let reconnectTimeout;
+    const connect = () => {
+      ws = new WebSocket("ws://localhost:8000/ws/orders");
+      ws.onopen = () => {
+        console.log("WebSocket connected in NewOrders");
+      };
+      ws.onmessage = (event) => {
+        console.log("Received order update:", event.data);
+        try {
+          const data = JSON.parse(event.data);
+          let incomingOrders = [];
+          if (data.orders) {
+            if (Array.isArray(data.orders)) {
+              incomingOrders = data.orders;
+            } else if (typeof data.orders === "object") {
+              incomingOrders = [data.orders];
+            }
+          } else if (data.order) {
+            incomingOrders = [data.order];
+          }
+          if (incomingOrders.length > 0) {
+            setOrders((prevOrders) => {
+              let updatedOrders = [...prevOrders];
+              incomingOrders.forEach((incoming) => {
+                const idx = updatedOrders.findIndex(
+                  (o) => o.quoteId === incoming.quoteId
+                );
+                if (idx > -1) {
+                  // Update existing order
+                  updatedOrders[idx] = incoming;
+                } else {
+                  // Insert new order at the beginning
+                  updatedOrders.unshift(incoming);
+                }
+              });
+              return updatedOrders;
+            });
+          }
+        } catch (err) {
+          console.error("Error parsing WebSocket message", err);
         }
-      } catch (err) {
-        console.error("Error parsing WebSocket message", err);
-      }
+      };
+      ws.onerror = (error) => {
+        console.error("WebSocket error in NewOrders:", error);
+        ws.close();
+      };
+      ws.onclose = () => {
+        console.log("WebSocket disconnected in NewOrders, attempting reconnect in 5 seconds");
+        reconnectTimeout = setTimeout(connect, 5000);
+      };
     };
 
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
-    };
-
+    connect();
     return () => {
-      ws.close();
+      clearTimeout(reconnectTimeout);
+      ws && ws.close();
     };
   }, []);
 
-  // Sort orders so that the newest (by createdAt) are displayed first.
+  // Filter orders that are "new" or "working"
   const sortedOrders = orders.slice().sort(
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
   );
-// Only show orders that are still "new" or "working"
-const newFilteredOrders = sortedOrders.filter(
-  (order) => order.state === "new" || order.state === "working"
-);
-const totalPages = Math.ceil(newFilteredOrders.length / pageSize);
-const startIndex = (currentPage - 1) * pageSize;
-const currentOrders = newFilteredOrders.slice(startIndex, startIndex + pageSize);
+  const newFilteredOrders = sortedOrders.filter(
+    (order) => order.state === "new" || order.state === "working"
+  );
+  const totalPages = Math.ceil(newFilteredOrders.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const currentOrders = newFilteredOrders.slice(startIndex, startIndex + pageSize);
 
   // Map order state to CSS badge classes.
   const getStateBadgeClass = (state) => {
@@ -114,12 +140,9 @@ const currentOrders = newFilteredOrders.slice(startIndex, startIndex + pageSize)
     }
   };
 
-  // Update the order's exchange rate in the state, recalc the buy amount,
-  // and set its state to "working".
   const handleExchangeRateChange = (e, quoteId) => {
     const newRateNumber = parseFloat(e.target.value);
     const newRateFormatted = isNaN(newRateNumber) ? "0.0000" : newRateNumber.toFixed(4);
-
     setOrders((prevOrders) =>
       prevOrders.map((order) => {
         if (order.quoteId === quoteId) {
@@ -129,7 +152,7 @@ const currentOrders = newFilteredOrders.slice(startIndex, startIndex + pageSize)
             ...order,
             exchangeRate: newRateFormatted,
             buyAmount: calculatedBuyAmount,
-            state: "working", // Change state to working immediately
+            state: "working", // Update state immediately as "working"
           };
         }
         return order;
@@ -137,23 +160,22 @@ const currentOrders = newFilteredOrders.slice(startIndex, startIndex + pageSize)
     );
   };
 
-  // When the user finishes adjusting the exchange rate (onBlur),
-  // update the backend with the final order details.
-  // The backend will update the order state (and broadcast to all clients).
   const handleExchangeRateBlur = (quoteId) => {
     const updatedOrder = orders.find((order) => order.quoteId === quoteId);
     if (updatedOrder) {
       updateOrderOnBackend(updatedOrder);
-      // Optionally, publish additional event details here.
     }
   };
 
-  const handlePrevPage = () => {
+  const handlePrevPage = () =>
     setCurrentPage((prev) => Math.max(prev - 1, 1));
-  };
-
-  const handleNextPage = () => {
+  const handleNextPage = () =>
     setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+
+  // In this demo, handleChatLaunch simply opens a new window.
+  const handleChatLaunch = (room_id) => {
+    if (!room_id) return;
+    window.open(`https://preview.symphony.com/?room_id=${room_id}`, "_blank");
   };
 
   return (
@@ -177,15 +199,9 @@ const currentOrders = newFilteredOrders.slice(startIndex, startIndex + pageSize)
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {currentOrders.map((order) => (
               <tr key={order.quoteId}>
-                <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                  {order.quoteId}
-                </td>
-                <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                  {new Date(order.valueDate).toLocaleString()}
-                </td>
-                <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                  {order.currencyPair}
-                </td>
+                <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">{order.quoteId}</td>
+                <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">{new Date(order.valueDate).toLocaleString()}</td>
+                <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">{order.currencyPair}</td>
                 <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
                   {order.sellAmount} {order.sellCurrency}
                 </td>
@@ -211,38 +227,28 @@ const currentOrders = newFilteredOrders.slice(startIndex, startIndex + pageSize)
                       {order.state.toUpperCase()}
                     </button>
                   ) : (
-                    <span className={`w-24 h-8 border rounded flex items-center justify-center text-xs font-medium ${getStateBadgeClass(order.state)}`}>
+                    <span
+                      className={`w-24 h-8 border rounded flex items-center justify-center text-xs font-medium ${getStateBadgeClass(order.state)}`}
+                    >
                       {order.state.toUpperCase()}
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                  {new Date(order.createdAt).toLocaleString()}
-                </td>
-                <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                  {new Date(order.expiresAt).toLocaleString()}
-                </td>
+                <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">{new Date(order.createdAt).toLocaleString()}</td>
+                <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">{new Date(order.expiresAt).toLocaleString()}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
       <div className="flex justify-between mt-4">
-        <button
-          onClick={handlePrevPage}
-          disabled={currentPage === 1}
-          className="px-4 py-2 border rounded disabled:opacity-50"
-        >
+        <button onClick={handlePrevPage} disabled={currentPage === 1} className="px-4 py-2 border rounded disabled:opacity-50">
           Previous
         </button>
         <span className="px-4 py-2 text-sm">
           Page {currentPage} of {totalPages}
         </span>
-        <button
-          onClick={handleNextPage}
-          disabled={currentPage === totalPages}
-          className="px-4 py-2 border rounded disabled:opacity-50"
-        >
+        <button onClick={handleNextPage} disabled={currentPage === totalPages} className="px-4 py-2 border rounded disabled:opacity-50">
           Next
         </button>
       </div>

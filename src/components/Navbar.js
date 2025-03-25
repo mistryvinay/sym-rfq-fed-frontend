@@ -2,7 +2,6 @@ import React, { useContext, useRef, useEffect, useState } from "react";
 import { ThemeContext } from "../context/ThemeContext";
 import { useNavigate, Link } from "react-router-dom";
 
-// Load Backend URL from Environment Variable
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 const Navbar = () => {
@@ -10,8 +9,38 @@ const Navbar = () => {
   const { theme, setTheme } = useContext(ThemeContext);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
+  const [socketConnected, setSocketConnected] = useState(false);
+  const reconnectInterval = 5000; // 5 seconds restart
 
-  // Close the menu when clicking outside
+  useEffect(() => {
+    let ws;
+    let reconnectTimeout;
+
+    const connect = () => {
+      ws = new WebSocket("ws://localhost:8000/ws/orders");
+      ws.onopen = () => {
+        console.log("WebSocket connected in Navbar");
+        setSocketConnected(true);
+      };
+      ws.onclose = () => {
+        console.log("WebSocket disconnected in Navbar, attempting reconnect in 5 seconds");
+        setSocketConnected(false);
+        reconnectTimeout = setTimeout(connect, reconnectInterval);
+      };
+      ws.onerror = (error) => {
+        console.error("WebSocket error in Navbar:", error);
+        ws.close();
+      };
+    };
+
+    connect();
+
+    return () => {
+      clearTimeout(reconnectTimeout);
+      ws && ws.close();
+    };
+  }, []);
+
   useEffect(() => {
     function handleClickOutside(event) {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -22,21 +51,18 @@ const Navbar = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Handle logout
   const handleLogout = async () => {
     try {
       await fetch(`${BACKEND_URL}/auth/logout`, {
         method: "GET",
         credentials: "include",
       });
-
       navigate("/login");
     } catch (error) {
       console.error("🚨 Logout Error:", error);
     }
   };
 
-  // For now, simulate a user object
   const user = { name: "Test User", picture: "/path/to/profile/picture.jpg" };
 
   if (!user) return null;
@@ -63,58 +89,24 @@ const Navbar = () => {
           </Link>
         </div>
 
-        {/* Right Side: Theme Toggle & Profile Menu */}
+        {/* Right Side: Connection Indicator, Theme Toggle & Profile Menu */}
         <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-1">
+            <div
+              className={`w-3 h-3 rounded-full ${
+                socketConnected ? "bg-green-500" : "bg-red-500"
+              }`}
+            ></div>
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              {socketConnected ? "Connected" : "Disconnected"}
+            </span>
+          </div>
           <button
             onClick={() => setTheme(theme === "light" ? "dark" : "light")}
             className="p-2 rounded-md transition-all duration-300 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
           >
             {theme === "light" ? "🌙" : "☀️"}
           </button>
-
-          {/* <div className="relative flex items-center space-x-2">
-            <img
-              src={user.picture}
-              alt="Profile"
-              className="h-8 w-8 rounded-full border border-gray-300 dark:border-gray-600"
-            />
-            <span className="text-gray-900 dark:text-white hidden md:inline">
-              {user.name}
-            </span>
-
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="focus:outline-none p-2 rounded-md transition-all hover:bg-gray-200 dark:hover:bg-gray-700"
-            >
-              <svg
-                className="w-5 h-5 text-gray-500 dark:text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M4 6h16M4 12h16m-7 6h7"
-                />
-              </svg>
-            </button>
-
-            {menuOpen && (
-              <div
-                ref={menuRef}
-                className="absolute right-0 mt-3 w-44 bg-white dark:bg-gray-800 rounded-lg shadow-md border dark:border-gray-700 z-50"
-              >
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-                >
-                  Logout
-                </button>
-              </div>
-            )}
-          </div> */}
         </div>
       </div>
     </nav>
